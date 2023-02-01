@@ -24,31 +24,24 @@ echo "                                                                          
 echo "***********************************************************************************************************"
 
 
-FILE1=/etc/NetworkManager/conf.d/randommac.conf
-FILE2=/etc/NetworkManager/conf.d/dhclient.conf
+#Find all network interfaces
+INTERFACES=$(ip link show | grep -o '^[0-9]: .*' | awk '{print $2}' | sed 's/://')
 
-cat >$FILE1<<EOF
-[device]
-wifi.scan-rand-mac-address=yes
+for INTERFACE in $INTERFACES; 
+do
 
-[connection]
-wifi.cloned-mac-address=random
-ethernet.cloned-mac-address=random
-connection.stable-id=${CONNECTION}/${BOOT}
-EOF
+#Find current MAC address
+  CURRENT_MAC=$(ifconfig $INTERFACE | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
 
-echo "                                                                                                           "
-echo "Congratulations your MAC Address is now randomized which will change with each reboot/connection."
-echo "                                                                                                           "
+# Generate new MAC address
+  NEW_MAC=$(openssl rand -hex 6 | sed 's/\(..\)/\1:/g; s/.$//')
 
-cat >$FILE2<<EOF
-[main]
-dhcp=dhclient
-EOF
+# Change MAC address
+  ifconfig $INTERFACE down
+  ifconfig $INTERFACE hw ether $NEW_MAC
+  ifconfig $INTERFACE up
 
-echo "                                                                                                           "
-echo 'To prevent your hostname from being sent to router, goto "/etc/dhcp/dhclient.conf" and commentout (add "#") to line starting with "send host-name = gethostname();"'
-echo "                                                                                                           "
-echo "Please REBOOT your system for changes to take place."
-echo "                                                                                                           "
-echo "***********************************************************************************************************"
+# Print old & new MAC addresses in terminal
+  NEW_MAC=$(ifconfig $INTERFACE | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}')
+  echo "MAC address for $INTERFACE changed from $CURRENT_MAC to $NEW_MAC"
+done
